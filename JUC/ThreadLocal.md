@@ -40,6 +40,8 @@ public class ThreadLocal<T> {
 
 使用匿名内部类的方式重写了initialvalue方法，解决SimpleDateFormat线程不安全的问题
 
+![image-20220225164151836](C:\Users\lfl\AppData\Roaming\Typora\typora-user-images\image-20220225164151836.png)
+
 ![image-20220208091614282](C:\Users\lfl\AppData\Roaming\Typora\typora-user-images\image-20220208091614282.png)
 
 ### ThreadLocal的get方法

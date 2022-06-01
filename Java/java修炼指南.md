@@ -1,21 +1,29 @@
-# 第一章 Java必须掌握的基础类
+# Java必须掌握的基础类
 
-## 1.1 JDK中所有类的基类——Object类
+## Object类
 
-### 1.1.1 为什么java.lang包下的类不需要手动导入
+### 为什么java.lang包下的类不需要手动导入
 
 首先，介绍一下java中的两种导包规则：
 
 1. 单类型导入
 2. 按需类型导入（也就是如果把整个包导入而不是一个类，那么这个包里面的所有类是不会一下子全导入的，在编译的时候，需要什么类再导入什么类）
 
+Java编辑器会从启动目录（bootstrap）、扩展目录（extentsion）和用户类路径去定位需要导入的类，而这些目录仅给出了类的顶层目录，编译器的类文件定位法大致可以理解为：顶层路径名\包名\文件名.class = 绝对路径
+
 编译器查找类的步骤：
 
 1. 首先搜索无名包
-2. 然后搜索当前包
+2. 然后搜索当前包，
 3. 最后搜索导入的包（此时会自动导入java.lang包）
 
 **因为用的多，所以提前加载这个包文件，节省了资源**
+
+import的作用：
+
+import的机制和package有很大的关系，如果我们不使用package，那么java类名的冲突就会增加，因此增加了package使得java类的名字出现冲突的几率大大降低，
+
+但是我们在使用类的时候如果把包名也加上，那么代码会变得十分冗余，因此为了降低代码的冗余程度，引入了import关键字，import就是在java文件开头的地方，先说明会用到那些类别，接着我们就能在代码中只用类名指定的某个类，也就是只称呼名字，不称呼它的姓名
 
 ### 1.1.2 类构造器
 
@@ -61,6 +69,8 @@ public final native Class<?> getClass();
 4. 通过类加载器获取
 
 ### 1.1.5 hashCode方法
+
+jvm源码提供了6种计算hash值的方案，有自增序列，随机数，关联内存地址等多种方式，其中官方默认的是最后一种，即随机数生成。因此可以看出hashCode也许和内存地址有关系，但是不是直接代表内存地址的，具体需要开虚拟机版本和设置。
 
 #### 1. hashCode是什么？
 
@@ -108,6 +118,13 @@ private static native void registerNatives();
 
 这个方法的作用是在类加载的时候注册本地方法。
 
+### native关键字使用规则
+
+1. native标识符除了不能和abstract联用外，可以与其他标识符联用
+2. native method方法可以返回任何java类型，包括非基本类型，也可以进行异常控制
+3. 如果含有该native method方法的类被继承，子类会继承这个native method方法，也可以使用java语言重写这个方法
+4. 如果一个native method方法被final标识，它被继承后不能被重写。
+
 ## 1.2 Java的深拷贝和浅拷贝
 
 ### 1.2.1 创建对象的五种方式
@@ -137,7 +154,7 @@ java 中的浅拷贝和深拷贝就是通过clone方法实现的
 
 ### 1.2.4 浅拷贝
 
-创建一个对象，然后将当前对象的非静态字段复制到该新对象，如果字段是值类型的，那么对该字段执行复制；如果该字段是引用类型的，则复制引用但不复制引用的对象。因此，原对象及其副本引用同一个对象。
+创建一个对象，然后将当前对象的**非静态字段复制到该新对象**，如果字段是值类型的，那么对该字段执行复制；如果该字段是引用类型的，则复制引用但不复制引用的对象。因此，原对象及其副本引用同一个对象。
 
 ### 1.2.5 深拷贝
 
@@ -146,7 +163,40 @@ java 中的浅拷贝和深拷贝就是通过clone方法实现的
 ### 1.2.6 如何实现深拷贝
 
 1. 让每个引用类型属性内部都重写clone（）方法。
+
+   对象需要实现Cloneable接口
+
 2. 利用序列化。
+
+   对象需要实现Serializable接口，然后再使用对象输出流写出对象，最后使用对象读入流读入对象，从而实现对象的深拷贝。
+
+   利用这种实现方式，如果对象中添加属性，那么这个属性只需要实现Serializable接口即可，不用实现clone方法
+
+   ```java
+   public class CloneUtil {
+    
+       public static <T extends Serializable> T clone(T obj) {
+           T cloneObj = null;
+           try {
+               // 写入字节流
+               ByteArrayOutputStream out = new ByteArrayOutputStream();
+               ObjectOutputStream obs = new ObjectOutputStream(out);
+               obs.writeObject(obj);
+               obs.close();
+    
+               // 分配内存，写入原始对象，生成新对象
+               ByteArrayInputStream ios = new ByteArrayInputStream(out.toByteArray());
+               ObjectInputStream ois = new ObjectInputStream(ios);
+               // 返回生成的新对象
+               cloneObj = (T) ois.readObject();
+               ois.close();
+           } catch (Exception e) {
+               e.printStackTrace();
+           }
+           return cloneObj;
+       }
+   }
+   ```
 
 ## 1.3 最常用的引用类Integer类
 
@@ -156,7 +206,7 @@ String字符串实际上是一个char数组
 
 ### 1.4.4 hashCode（）为什么选择31
 
-1. 31 是一个不大不小的指数，是作为hashCode乘子的优质质数之一。
+1. 31 是一个不大不小的质数，是作为hashCode乘子的优质质数之一。
 2. 更少的乘积结果冲突。
 3. 31 可以被jvm优化，31 * i = （i << 5）- i。因此乘法运算可以利用移位和加减代替，提高效率
 
@@ -181,18 +231,30 @@ String源码中value字符数组被final修饰，但是被final修饰数组类�
 1. 如果可变会引发安全问题
 2. 保证线程安全
 
-# 第二章 Java数据结构的实现 集合类
+# Java 集合类
+
+List——ArrayList√，Vector√，LinkedList√
+
+Set——HashSet√，LinkedHashSet，TreeSet
+
+Queue，Deque——ArrayDeque，LinkedList√，PriorityQueue
+
+Map——HashMap√，HashTable，TreeMap，LinkedHashMap，ConcurrentHashMap
 
 ![image-20210926100734655](C:\Users\lfl\AppData\Roaming\Typora\typora-user-images\image-20210926100734655.png)
 
-## 2.1 集合工具类中的重要类——Arrays类
+## Arrays类
+
+此类包含用于操作数组（例如排序和搜索）的各种方法，还包含一个语序将数组视为列表的静态工厂
+
+其中的方法主要包括：排序sort，并行累加parelladd，搜索search、两个数组相等判断equals、数组填充fill，数组复制copyof，asList，hashCode，deepHashCode，toString，deepToString，Streaming
 
 ### 2.1.1 asList 方法
 
 ```java
 public static <T> List<T> asList(T... a) {
         return new ArrayList<>(a);
-    }
+}
 ```
 
 该方法的作用是返回由指定数组支持的固定大小列表。
@@ -256,9 +318,11 @@ public static boolean deepEquals(Object[] a1, Object[] a2)
 
 和equals与deepEquals方法差不多，toString用来打印一维数组，deepToString用来打印多位数组。
 
-## 2.2 List集合的一种典型实现——ArrayList类
+## List接口
 
- ### 2.2.1 ArrayList的定义
+### ArrayList类
+
+ #### 2.2.1 ArrayList的定义
 
 用数组实现的集合，支持随机访问，元素有序且可以重复访问。
 
@@ -271,7 +335,9 @@ public interface RandomAccess {
 }
 ```
 
-这是一个标记接口（里面什么都没有），以表明实现这个接口的类支持快速的随机访问。该接口的主要目的是允许通用算法改变其行为（比如在工具类Collections中，应用二分查找方法可以判断是否实现了RandomAccess接口，如果实现了这个接口，那么我就可以使用随机访问的方式去查找）。
+#### RandomAccess接口的作用
+
+这是一个标记接口（里面什么都没有），以表明实现这个接口的类支持快速的随机访问。**该接口的主要目的是允许通用算法改变其行为（比如在工具类Collections中，应用二分查找方法可以判断是否实现了RandomAccess接口，如果实现了这个接口，那么我就可以使用随机访问的方式去查找）。**
 
 ```java
 int binarySearch(List<? extends Comparable<? super T>> list, T key) {
@@ -306,17 +372,63 @@ public interface Serializable {
 
 这个接口是List类集合的上层接口，定义了实现该接口的类都必须实现的一组方法。
 
-### 2.2.2 字段属性
+#### 2.2.2 字段属性
 
-其中Object[]类型的elementDate属性被**transient**[Java transient 关键字 | 菜鸟教程 (runoob.com)](https://www.runoob.com/w3cnote/java-transient-keywords.html)关键字修饰。
+```java
+public class ArrayList<E> extends AbstractList<E>
+        implements List<E>, RandomAccess, Cloneable, java.io.Serializable
+{
+    private static final long serialVersionUID = 8683452581122892189L;
+
+    /**
+     * Default initial capacity.
+     */
+    private static final int DEFAULT_CAPACITY = 10;
+
+    /**
+     * Shared empty array instance used for empty instances.
+     */
+    private static final Object[] EMPTY_ELEMENTDATA = {};
+
+    /**
+     * Shared empty array instance used for default sized empty instances. We
+     * distinguish this from EMPTY_ELEMENTDATA to know how much to inflate when
+     * first element is added.
+     */
+    private static final Object[] DEFAULTCAPACITY_EMPTY_ELEMENTDATA = {};
+
+    /**
+     * The array buffer into which the elements of the ArrayList are stored.
+     * The capacity of the ArrayList is the length of this array buffer. Any
+     * empty ArrayList with elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA
+     * will be expanded to DEFAULT_CAPACITY when the first element is added.
+     */
+    transient Object[] elementData; // non-private to simplify nested class access
+
+    /**
+     * The size of the ArrayList (the number of elements it contains).
+     *
+     * @serial
+     */
+    private int size;
+}
+```
+
+其中Object[]类型的elementData属性被**transient**[Java transient 关键字 | 菜鸟教程 (runoob.com)](https://www.runoob.com/w3cnote/java-transient-keywords.html)关键字修饰。
 
 > transient(转瞬即逝的)：java 的transient关键字为我们提供了便利，你只需要实现Serilizable接口，将不需要序列化的属性前添加关键字transient，序列化对象的时候，这个属性就不会序列化到指定的目的地中。
+>
+> 虽然elementData属性被transient关键字修饰，但是在对ArrayList对象进行序列化和反序列化的时候利用writeObject方法和readObject方法对对象的elementData属性中的值进行了写入和读出
+>
+> 这样做的目的是避免elementData中大量空闲的位置占用空间，序列化和反序列化的效率
 
 有两个很相似的字段：EMPTY_ELEMENTDATA和DEFAULTCAPACITY_EMPTY_ELEMENTDATA，虽然说这两个字段都是一个空的Object[]对象，但是他两的用法却不一样。
 
-如果使用默认的构造函数，那么elementDate属性将被赋值为DEFAULTCAPACITY_EMPTY_ELEMENTDATA，此时elementDate的容量为0；如果使用带初始化容量参数的构造函数，那么elementData属性将被赋值为EMPTY_ELEMENTDATA。在以后的第一次add操作中，如果elementData等于DEFAULTCAPACITY_EMPTY_ELEMENTDATA，那么elementData的容量直接初始化为默认的10；但是如果不是，那么就按照扩容规则扩容。
+* 如果使用默认的构造函数，那么elementDate属性将被赋值为DEFAULTCAPACITY_EMPTY_ELEMENTDATA，此时elementDate还没有被初始化；
+* 如果使用带初始化容量参数的构造函数，并且初始化容量为0，那么elementData属性将被赋值为EMPTY_ELEMENTDATA, 如果初始化容量不为0，那么直接将elementdata初始化。
+* 在以后的第一次add操作中，如果elementData等于DEFAULTCAPACITY_EMPTY_ELEMENTDATA，那么elementData的容量直接初始化为默认的10；但是如果不是，那么就按照扩容规则扩容。
 
-### 2.2.3 构造函数
+#### 2.2.3 构造函数
 
 ArrayList中有三种构造函数：
 
@@ -328,36 +440,143 @@ ArrayList中有三种构造函数：
 public ArrayList(Collection<? extends E> c)
 ```
 
-### 2.2.4 添加元素
+#### 2.2.4 添加元素
 
 添加元素需要使用数组的扩容。
 
 扩容的核心是调用Arrays.copyOf方法来创建一个更大的数组，然后把原数组复制过去。
 
-还没弄明白。
+1. 首先调用ensureCapacityInternal来确保数组用容量添加元素
+   1. 如果使用默认构造方法创建的ArrayList，ensureCapacityInternal方法中的minCapacity第一次会变为10
+   2. 如果使用带有初始容量的构造方法构造ArrayList，ensureCapacityInternal方法中的minCapacity第一次会是1
+2. 如果minCapacity大于了elementData的长度，进入grow方法进行扩容
+3. grow方法中比较关键的就是每次容量扩大1.5倍，以及ArrayList有容量的最大值Integer.MAX_VALUE - 8
+4. grow方法确保了newCapacity一定大于等于minCapacity，如果elementdata的旧长度经过乘1.5之后，超过了Integer的最大值，那么elementdata的容量仅仅只会增加1，
+5. 如果elementdata的长度增加到Integer.Max_value-7，那么它的长度会直接增加到Integer.Max
 
-### 2.2.5 删除元素
+如果容量到达了Integer.Max，那么会在hugeCapacity方法中抛出异常，因为minCapacity小于0了，此时为什么会进入hugeCapacity呢，因为newCapacity肯定是一个负数，然后减去Integer.Max-8，将会变成一个正数，因此会进入hugeCapacity这个函数，因此会在这个函数抛出异常
 
-1. 根据索引删除元素
+```Java
+public boolean add(E e) {
+    ensureCapacityInternal(size + 1);  // Increments modCount!!
+    elementData[size++] = e;
+    return true;
+}
 
-首先确定index范围，然后使用System的arraycopy把index后面的元素复制到index开始的位置，然后使最后一个位置的引用为null，最后返回删除index位置的元素值。
+private void ensureCapacityInternal(int minCapacity) {
+    if (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA) {
+        minCapacity = Math.max(DEFAULT_CAPACITY, minCapacity);
+    }
 
-2. 直接删除指定元素
+    ensureExplicitCapacity(minCapacity);
+}
+
+private void ensureExplicitCapacity(int minCapacity) {
+    modCount++;
+
+    // overflow-conscious code
+    if (minCapacity - elementData.length > 0)
+        grow(minCapacity);
+}
+
+private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
+
+private void grow(int minCapacity) {
+    // overflow-conscious code
+    int oldCapacity = elementData.length;
+    int newCapacity = oldCapacity + (oldCapacity >> 1);
+    if (newCapacity - minCapacity < 0)
+        newCapacity = minCapacity;
+    if (newCapacity - MAX_ARRAY_SIZE > 0)
+        newCapacity = hugeCapacity(minCapacity);
+    // minCapacity is usually close to size, so this is a win:
+    elementData = Arrays.copyOf(elementData, newCapacity);
+}
+
+private static int hugeCapacity(int minCapacity) {
+    if (minCapacity < 0) // overflow
+        throw new OutOfMemoryError();
+    return (minCapacity > MAX_ARRAY_SIZE) ?
+        Integer.MAX_VALUE :
+    MAX_ARRAY_SIZE;
+}
+```
+
+#### 2.2.5 删除元素
+
+**根据索引删除元素**
+
+* 首先确定index范围，
+* 然后使用System的arraycopy把index后面的元素复制到index开始的位置，
+* 然后使最后一个位置的引用为null，
+* 最后返回删除index位置的元素值。
+
+```java
+public E remove(int index) {
+    rangeCheck(index);
+
+    modCount++;
+    E oldValue = elementData(index);
+
+    int numMoved = size - index - 1;
+    if (numMoved > 0)
+        System.arraycopy(elementData, index+1, elementData, index,
+                         numMoved);
+    elementData[--size] = null; // clear to let GC do its work
+
+    return oldValue;
+}
+
+E elementData(int index) {
+    return (E) elementData[index];
+}
+```
+
+直接删除指定元素
 
 分为两种情况，指定元素为null以及不为null。为什么要分这两种情况呢？因为删除元素我们应该使用equals方法，而不是==，但是如果元素为null，我们使用equals方法的时候就会报异常，所以如果我们传入的对象不为null，我们就是用传入的对象的equals方法来比较元素是否相等，如果为null，则直接使用==运算符。
 
-### 2.2.6 修改元素
+根据指定元素删除的时候，只会删除第一次出现的相等的元素
+
+```JAVA
+public boolean remove(Object o) {
+    if (o == null) {
+        for (int index = 0; index < size; index++)
+            if (elementData[index] == null) {
+                fastRemove(index);
+                return true;
+            }
+    } else {
+        for (int index = 0; index < size; index++)
+            if (o.equals(elementData[index])) {
+                fastRemove(index);
+                return true;
+            }
+    }
+    return false;
+}
+private void fastRemove(int index) {
+    modCount++;
+    int numMoved = size - index - 1;
+    if (numMoved > 0)
+        System.arraycopy(elementData, index+1, elementData, index,
+                         numMoved);
+    elementData[--size] = null; // clear to let GC do its work
+}
+```
+
+#### 2.2.6 修改元素
 
 通过set方法将指定索引index处的元素替换为element，并返回原数组元素。（自己本身就具有的set方法）
 
 在Iter中的set方法会检查线程安全。
 
-### 2.2.7 查找元素
+#### 2.2.7 查找元素
 
 1. 根据索引查找
 2. 根据元素查找——indexOf和lastIndexOf
 
-### 2.2.8 遍历集合
+#### 2.2.8 遍历集合
 
 1. 普通for循环遍历
 2. 迭代器iterator
@@ -368,7 +587,7 @@ public ArrayList(Collection<? extends E> c)
 
 ArrayList使用内部类ListItr继承内部类Itr实现了ListIterator接口，相比Iterator迭代器，ListIterator多了能向前迭代以及能够新增元素的功能。
 
-### 2.2.9 subList方法
+#### 2.2.9 subList方法
 
 ```java
 public List<E> subList(int fromIndex, int toIndex) {
@@ -383,27 +602,148 @@ SubList类是ArrayList中的一个内部类。
 
 如果想要独立出来一个集合，可以使用ArrayList的第三种构造方法。
 
-## 2.3 List 集合的另一种典型实现——LinkedList类
+#### 集合转换为数组toArray方法
+
+```java
+public <T> T[] toArray(T[] a) {
+    if (a.length < size)
+        // Make a new array of a's runtime type, but my contents:
+        return (T[]) Arrays.copyOf(elementData, size, a.getClass());
+    System.arraycopy(elementData, 0, a, 0, size);
+    if (a.length > size)
+        a[size] = null;
+    return a;
+}
+```
+
+使用ArrayList的toArray方法可以很方便的将集合转换为相应类型的数组。
+
+#### ArrayList类中的elementData字段为什么使用transient关键字修饰？
+
+
+
+### Vector类
+
+Vector类中维护了一个字段—capacityIncrement，这点是和ArrayList有很大的不同的，具体体现在一下：
+
+* Vector在调用默认构造函数的时候，还是会给elementDate进行初始化，不会懒惰初始化，默认初始容量为10
+* 当Vector在扩容的时候会先判断capacityIncrement字段是否大于0，如果大于零，那么新长度就会是旧长度加上capacityIncrement，如果小于等于0，新长度为旧长度的两倍，而不是ArrayList中的1.5倍
+
+#### 字段属性
+
+```Java
+public class Vector<E>
+    extends AbstractList<E>
+    implements List<E>, RandomAccess, Cloneable, java.io.Serializable
+{
+    protected Object[] elementData;
+    protected int elementCount;
+
+    /**
+在 Vector中，如果指定了这个 capacityIncrement，就会在原来容量的基础上增加 capacityIncrement；如果没有指定，则增加一倍容量。*/
+    protected int capacityIncrement;
+}
+```
+
+#### 添加元素
+
+添加元素的方法是一个同步方法，因为vector是一个线程安全的List集合
+
+vector添加元素的主要逻辑和ArrayList一样，唯一不同的一定是因为vector有一个capacityIncrement属性，当设置了这个属性之后，每次扩容的量不再是原来容量的1.5倍，而是原容量加上capacityIncrement；如果没有设置这个属性，那么扩容的容量是原容量的2倍。
+
+```java
+public synchronized boolean add(E e) {
+    modCount++;
+    ensureCapacityHelper(elementCount + 1);
+    elementData[elementCount++] = e;
+    return true;
+}
+
+private void ensureCapacityHelper(int minCapacity) {
+    // overflow-conscious code
+    if (minCapacity - elementData.length > 0)
+        grow(minCapacity);
+}
+
+private void grow(int minCapacity) {
+    // overflow-conscious code
+    int oldCapacity = elementData.length;
+    int newCapacity = oldCapacity + ((capacityIncrement > 0) ?
+                                     capacityIncrement : oldCapacity);
+    if (newCapacity - minCapacity < 0)
+        newCapacity = minCapacity;
+    if (newCapacity - MAX_ARRAY_SIZE > 0)
+        newCapacity = hugeCapacity(minCapacity);
+    elementData = Arrays.copyOf(elementData, newCapacity);
+}
+
+private static int hugeCapacity(int minCapacity) {
+    if (minCapacity < 0) // overflow
+        throw new OutOfMemoryError();
+    return (minCapacity > MAX_ARRAY_SIZE) ?
+        Integer.MAX_VALUE :
+    MAX_ARRAY_SIZE;
+}
+```
+
+### Stack类
+
+Stack继承自Vector类，内部直接调用Vector类的添加，删除，获取元素的方法，同时因为Vector类使用synchronized进行加锁，因此Stack类在进行push和pop，peek的时候会对线程进行加锁，因此感觉最好不要使用Stack
+
+### LinkedList类
 
 之前的ArrayList使用数组构成，但是LinkedList这是一个使用链表（Linked list）构成的类。
 
 LinkedList总共有四个内部类分别是ListItr、Node、DescendingIterator、LLSpliterator。
 
-### 2.3.1 LinkedList 的定义
+#### 2.3.1 LinkedList 的定义
 
 LinkedList是一个用链表实现的集合，元素有序且可以重复。LinkedList也实现了Cloneable接口和Serializable接口，分别用来支持克隆以及序列化。也实现了List接口。
 
 但是LinkedList还实现了Deque接口，这是一个双向队列接口。
 
-### 2.3.2 字段属性
+#### 2.3.2 字段属性
 
-总共就三个属性，size、first、last，其中size代表LinkedList大小，first指向LinkedList第一个结点的指针，last指向LinkedList最后一个结点的指针。他们的类型是LinkedList内部类Node。
+总共就三个属性，size、first、last，
 
-### 2.3.3 构造函数
+* 其中size代表LinkedList大小，
+* first指向LinkedList第一个结点的指针，
+* last指向LinkedList最后一个结点的指针。
+
+他们的类型是LinkedList内部类Node。Node 内部类中只有三个属性：
+
+* 元素值 item
+* 前驱结点prev
+* 后继结点next
+
+```java
+public class LinkedList<E>
+    extends AbstractSequentialList<E>
+    implements List<E>, Deque<E>, Cloneable, java.io.Serializable
+{
+    transient int size = 0;
+    transient Node<E> first;
+    transient Node<E> last;
+}
+
+private static class Node<E> {
+    E item;
+    Node<E> next;
+    Node<E> prev;
+
+    Node(Node<E> prev, E element, Node<E> next) {
+        this.item = element;
+        this.next = next;
+        this.prev = prev;
+    }
+}
+```
+
+#### 2.3.3 构造函数
 
 有两个构造函数，一个是默认的构造函数，另一个是带有Collection类型参数的构造函数，用来直接初始化LinkedList，这个构造函数内部使用addAll方法把Collection集合中的元素全部初始化到LinkedList中。
 
-### 2.3.8 遍历集合
+#### 2.3.8 遍历集合
 
 1. 普通for循环
 
@@ -415,7 +755,128 @@ LinkedList是一个用链表实现的集合，元素有序且可以重复。Link
 
 迭代器每次方位一个元素后，都会用游标记录当前访问元素的位置`private Node<E> next;`，遍历一个元素记录一个位置。
 
-## 2.4 常用的集合——HashMap类
+#### 重要的函数
+
+在头部添加元素：
+
+* 首先构造一个新结点，新节点的prev设置为null，next设置为原来的头结点
+* 将头结点指针指向新结点
+* 如果原来的头结点为null，将尾结点指向新的结点
+* 如果原来的头结点不为null，将原来的头结点的前驱结点指向新的头结点
+
+```java
+private void linkFirst(E e) {
+    final Node<E> f = first;
+    final Node<E> newNode = new Node<>(null, e, f);
+    first = newNode;
+    if (f == null)
+        last = newNode;
+    else
+        f.prev = newNode;
+    size++;
+    modCount++;
+}
+```
+
+在尾部添加结点：
+
+* 首先构造一个新节点，新节点的next设置为null，prev设置为原来的尾结点
+* 将尾结点指向新的结点
+* 如果原来的尾结点为null，将头结点指向尾结点
+* 如果原来的尾结点不为null，将原来的尾结点的next指向新的尾结点
+
+```java
+void linkLast(E e) {
+    final Node<E> l = last;
+    final Node<E> newNode = new Node<>(l, e, null);
+    last = newNode;
+    if (l == null)
+        first = newNode;
+    else
+        l.next = newNode;
+    size++;
+    modCount++;
+}
+```
+
+在一个结点的前插入一个结点：
+
+这个方法和在头部添加一个元素的实现方法一样，只是将原来操作的头部结点换成了当前要被插入的结点的前驱结点
+
+```java
+void linkBefore(E e, Node<E> succ) {
+    // assert succ != null;
+    final Node<E> pred = succ.prev;
+    final Node<E> newNode = new Node<>(pred, e, succ);
+    succ.prev = newNode;
+    if (pred == null)
+        first = newNode;
+    else
+        pred.next = newNode;
+    size++;
+    modCount++;
+}
+```
+
+删除头结点
+
+* 首先获取头结点的值
+* 然后获取头结点的后继结点
+* 将头结点的值和后继结点赋值为null，帮助垃圾回收
+* 将头结点指向原来头结点的后继 结点
+* 如果头结点的后继结点为null，那么将尾结点也赋值为null
+* 如果头结点的后继结点不为null，将后结点的前驱结点赋值为null
+
+```java
+private E unlinkFirst(Node<E> f) {
+    // assert f == first && f != null;
+    final E element = f.item;
+    final Node<E> next = f.next;
+    f.item = null;
+    f.next = null; // help GC
+    first = next;
+    if (next == null)
+        last = null;
+    else
+        next.prev = null;
+    size--;
+    modCount++;
+    return element;
+}
+```
+
+
+
+### CopyOnWriteArrayList
+
+利用“写入时复制”的理念，也就是说在并发情况下，如果有线程想要去进行修改操作时，不会再原有的数组上进行修改，而是会创建当前容器的一个副本，在副本上进行修改，操作完毕后，再将数据的引用指向新的数组。
+
+然而读操作还是在原来的副本上进行的，这样做的好处是可以同时进行多个读操作。读操作使用原来的数据，写操作使用新的数组，这样读写之间就不会有冲突，读操作和写操作可以并发的执行。
+
+但是多个线程的写操作仍然需要同步锁进行线程同步。
+
+#### 优点
+
+* 读操作性能高，因为不需要任何同步措施，比较适合读多写少的并发场景。
+
+#### 缺点
+
+* 内存占用问题，每次进行修改操作，都要将源容器拷贝一份，数据量大时，对内存压力较大，可能会引起频繁GC
+* 无法保证实时性，Vector对读写操作均加锁同步，可以保证读和写的强一致性，而CopyOnWriteArrayList由于其实现策略的原因，写和读分贝作用在新老不同容器上，在写操作执行过程中，读不回阻塞但是读取到的却是老容器的数据。
+
+值得注意的是，CopyOnWriteArrayList中的elementData——array是一个使用volatile修饰的变量，只有使用volatile修饰，才可以实现CopyOnWrite这种无锁的并发。因为写线程在写完array副本之后，将array的副本赋值给之前的array引用，此时需要将这个引用对任意线程可见；同时在读线程进行读取的时候，需要里面更新本地的array应用，所以，需要使用volatile修饰变量，实现这种内存的可见性。
+
+
+
+## Map接口
+
+## HashTable
+
+不允许有Null的key，因为hashTable内部直接使用key的hashCode函数获取key的HashCode，但是HashMap可以有hashCode的key，因为HashMap中计算key的HashCode不是使用直接使用key的方法，而是先判断key是否为null，如果为null，直接返回0，不为null的时候才会调用hashCode函数，	
+
+
+
+## HashMap类
 
 ### 2.4.1 Hash表[散列表（哈希表）](http://data.biancheng.net/view/107.html)
 
@@ -428,6 +889,10 @@ Hash表也称为**散列表**，它是通过把关键码映射到表中的一个
 2. 多个key通过散列函数得到相同的值？
 
 * 开放地址法：当遇到冲突了，在通过另一种函数计算一遍，得到相应的映射关系。
+  * 线性探测
+  * 二次探测， 二次探测是过程是x+1,x+4,x+9,以此类推。二次探测的步数是原始位置相隔的步数的平方。
+  * 再哈希法
+
 * 链地址法：对key通过hash之后落在同一个地址上的值，做一个链表。遇到冲突就添加链表的结点。
 
 > 对于开放地址发，可能还会遇到冲突，所以需要良好的散列函数，分布的越均匀越好。
@@ -478,9 +943,9 @@ hashMap这种数据结构会产生两种问题：1. 如果空间利用率高，�
 
 > 加载因子 = 填入表中的元素个数 / 散列表的长度
 
-
-
 ```java
+static final int TREEIFY_THRESHOLD = 8;
+static final int UNTREEIFY_THRESHOLD = 6;
 static final int MIN_TREEIFY_CAPACITY = 64;
 ```
 
@@ -543,7 +1008,7 @@ HashMap中的哈希算法：
 static final int hash(Object key) {
         int h;
         return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
-    }
+}
 ```
 
 这个哈希算法算是一个“扰动函数”，它利用key自己的hashCode方法返回的32位int型的数来获取散列的值。但这时候问题就来了，这样就算我的散列值分布再松散，要是只取最后几位的话，碰撞也会很严重。更要命的是如果散列本身做得不好，分布上成等差数列的漏洞，恰好使最后几个低位呈现规律性重复，就无比蛋疼。所以HashMap中的hash方法利用hashCode值的高十六位与低十六位进行异或运算，使得低十六位更具有随机性，同时特保持了高十六位的特征。
@@ -551,6 +1016,21 @@ static final int hash(Object key) {
 但是如果直接用hashCode获得的值来当散列后的值很不现实（32位，40亿个数），所以HashMap利用对数组长度取模运算`(table.length - 1) & hash`作来进行散列值的获取。这也就解释了为什么HashMap中table的长度必须是2的n次方，这是HashMap在速度上的优化，只有这样我们通过table.length-1与hash值进行与运算才会得到hash对数组长度取模运算的值。
 
 ### 2.4.7 添加元素
+
+1. 首先通过hash函数获取经过扰动的hash值
+2. 然后调用putVal函数，进入真正的添加元素步骤
+3. 如果table为null，或者table的长度为0，则调用**resize方法对table属性进行初始化**
+4. 如果table中经过hash的模运算找到的位置中没有元素，那么直接创建node放入这个位置
+5. 如果发生了冲突，经过模运算找到的位置中放置了元素
+   1. 如果这个位置上的结点key和要插入元素的key相同（首先判断hash值是否相同，相同的话，如果key的地址相同或者key的equals方法返回相同，那么就代表这插入的节点和现在找到的结点是一个Node），替换value
+   2. 如果table这个位置上是红黑树，调用**putTreeVal方法向红黑树中添加元素**
+   3. 如果这个位置是链表，遍历链表的同时记录binCount
+      1. 如果在遍历的过程中，遇到和插入key相同的node，那么替换这个node的value
+      2. 如果遍历完链表之后，没有找到key相同的node，那么在链表末尾添加元素，同时，如果添加一个元素之后，链表的长度达到了8，进入treeifBin方法
+
+在添加元素的过程中，遇到相同key，替换value的操作实际上是通过一个标记的node e来延迟完成的，等到所有判断都判断完了，如果node e不为null，那么使用value替换e的value
+
+putVal方法的最后，如果table的size大于了threshold，**调用resize方法进行扩容**
 
 ```JAVA
 //hash(key)就是上面讲的hash方法，对其进行了第一步和第二步处理
@@ -603,7 +1083,7 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                     p = e;
                 }
             }
-            //当e！=null的时候，就说明链表中存在key的映射
+            //当e！=null的时候，就说明链表或者table中存在key的映射
             if (e != null) { // existing mapping for key
                 V oldValue = e.value;
                 if (!onlyIfAbsent || oldValue == null)
@@ -626,7 +1106,50 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
 
 ### 2.4.8 扩容机制
 
-扩容是由数组+链表+红黑树构成，向HashMap中插入元素时，如果HashMap集合的元素已经大于承载容量的threshold（capacity*loadFactor）,这里的threshold不是数组的最大长度。
+扩容函数会在第一次向HashMap中添加元素或者当加入元素之后，size大于了ThresHold这两种情况下发生。
+
+扩容是由数组+链表+红黑树的扩容操作构成，向HashMap中插入元素时，如果HashMap集合的元素已经大于承载容量的threshold（capacity*loadFactor）,这里的threshold不是数组的最大长度。
+
+首先经过一系列的判断来计算newCapacity和newThreshold
+
+1. 如果旧容量不为0，并且旧容量的2倍小于最大容量，那么将新容量和新扩容阈值都变为原来的两倍
+2. 如果旧容量为0，并且旧的扩容阈值不为零（在带有初始容量的构造函数构造hashMap时，将table的初始容量赋值到扩容阈值上），新的容量等于旧的扩容阈值
+3. 如果旧容量和扩容阈值都为0，两个都赋值为默认的，16和16*0.74
+4. 在第二种情况下，新的扩容阈值为0，那么最后再做一个判断，将新的容量乘上负载因子赋值为新的扩容阈值
+
+然后使用新的容量创建一个新的table，同时赋值给旧的table
+
+最后进行扩容逻辑：
+
+1. 如果旧的table为null，说明初次调用，创建完table之后就返回，表示初始化完成
+
+2. 如果旧的table不为null，这就牵扯上数据的移动，需要遍历旧的table进行数据移动操作
+
+   1. 如果旧table j位置上的node没有下一个结点，那么直接使用hash模上新的容量进行数据移动
+
+   2. 如果旧table j位置上的node是一个红河树结点，**那么调用头结点的split方法**
+
+   3. 如果旧table j位置上的node是一个链表，执行链表的数据移动操作
+
+      在同一个来表上的结点在扩容后的位置只有两种可能，一种是还在原来的位置，另一种是在原来的index加上旧容量大小的位置，因此就可以使用两个链表，
+
+      1. 如果链表上的结点的hash与上旧容量为1，放入第一个链表
+      2. 如果与上旧容量为0，放入第二个链表
+
+      最后将这两个链表放到新table的对应位置即可
+
+**如果旧table 的 j位置上是红河树，那么会调用头结点的split方法：**
+
+* 由于TreeNode继承自LinkedHashMap.Entry，然后LinkedHashMap.Entry继承自HashMap的Node，因此TreeNode结点是有next指针的，所以可以使用遍历链表的方式遍历红黑树
+* 红黑树的操作和链表的操作相似，都是首先使用两个链表将树中的元素分为两组
+* 如果分开的链表中的结点个数小于6个，那么**调用红黑树结点的untreeify将红黑树转化为链表**
+* 否则，如果另一个链表不为null（如果另一个链表为null，那么这个链表就是红黑树），**那么调用红黑树结点的treeify方法将链表转化为红黑树**
+
+untreeify方法的实现比较简单：
+
+* 遍历整个红黑树，构造一个链表，然后返回
+
+
 
 ```java
 final Node<K,V>[] resize() {
@@ -933,7 +1456,7 @@ public boolean containsValue(Object value) {
 
 Map.Entry我猜测它的作用是为了让我们能得到类似HashMap中Node<K,V>[]这样的私有成员键值对。HashMap并没有把内部类Node<K,V>公有，所以我们只能通过Map.Entry这个接口去获取类似HashMap中的Node这样的键值对。然后Hashmap还给我没提供了entrySet方法用于直接的获取Map.Entry集合，其实就是把许多Node键值对的集合视图提供给我们，有点像（适配器模式），虽然说我们外部拿到的是一个set，但是这个set（Set<Map.Entry<K,V>>）的各种方法，包括Map.Entry的各种方法，都是对内部的Node进行操作，Set中并没有存储Node，它只是一个视图，用于对Node惊醒操作。
 
-## 2.5 Map集合的一种实现——LinkedHashMap
+## LinkedHashMap
 
 ```java
 public class LinkedHashMap<K,V>
@@ -1125,7 +1648,7 @@ public V get(Object key) {
 
 LinkedHashMap和HashMap中的Iterator的继承体系如图所示。全部都有一种抽象类Iterator。
 
-## 2.6 基于树实现的类——TreeMap类
+## TreeMap类
 
 ```java
 public class TreeMap<K,V>
@@ -1381,7 +1904,7 @@ private void deleteEntry(Entry<K,V> p) {
 
 常规操作，获取Entryset的iterator。
 
-# 第三章 Java并发包原子类
+# Java原子类
 
 原子操作是指一个或者多个操作要么全部成功，要么全部失败。多线程并发操作同一变量时，一般是通过加锁的方式来保证操作的原子性，最常用的就是使用synchronized同步锁。使用加锁的方式，在高并发场景下，线程会被频繁的挂起和唤醒，这是比较消耗机器性能的。
 
@@ -1655,7 +2178,7 @@ public long sum() {
 
 可以看到sum方法中未使用任何锁，在调用这个方法的时候可能有其他线程正在执行add操作，所以在高并发场景中，这个方法只能得到一个近似值，如果想要得到绝对准确的值，还是要加全局锁。这也就是LongAdder不能完全代替AtomicLong的原因之一。
 
-# 第四章 java并发锁
+# java并发锁
 
 java早期提供synchronized关键字实现同步机制。可以用它修饰一个方法或者代码块。当时用synchronized修饰代码时，并不需要显示的执行加锁和解锁的过程，所以他也被称为隐式锁。
 
