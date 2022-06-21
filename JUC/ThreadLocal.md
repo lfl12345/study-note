@@ -282,3 +282,106 @@ void createMap(Thread t, T firstValue) {
 首先定义了一个AtomicInteger类型，每次获取当前值并加上HASH_INCREMENT，`HASH_INCREMENT = 0x61c88647`,这个值跟斐波那契数列（黄金分割数）有关，其主要目的就是为了让哈希码能均匀的分布在2的n次方的数组里, 也就是Entry[] table中，这样做可以**尽量避免hash冲突。**
 
  其次如果发生了hash冲突，ThreadLocalMap使用`线性探测法`来解决哈希冲突的。
+
+# InheritableThreadLocal原理
+
+ThreadLocal并不能夸线程共享，例如：如果父进程在ThreadLocal中set了一个值，如果父进程new Thread，那么在子线程中时获取不到父线程set的值。
+
+InheritableThread解决了上面的问题。
+
+## 原理
+
+```java
+public class InheritableThreadLocal<T> extends ThreadLocal<T> {
+    protected T childValue(T parentValue) {
+        return parentValue;
+    }
+
+    ThreadLocalMap getMap(Thread t) {
+       return t.inheritableThreadLocals;
+    }
+
+    void createMap(Thread t, T firstValue) {
+        t.inheritableThreadLocals = new ThreadLocalMap(this, firstValue);
+    }
+}
+```
+
+InheritableThread继承自ThreadLocal，重写了ThreadLocal中的三个方法。
+
+### new Thread()
+
+当父进程在new Thread()的时候，会调用Thread类的init方法，在init方法中，会判断父线程的inheritableThreadLocals属性是否为null， 如果不为null，会设置子线程的inheritableThreadLocals。
+
+```java
+public Thread() {
+  init(null, null, "Thread-" + nextThreadNum(), 0);
+}
+
+private void init(ThreadGroup g, Runnable target, String name,
+                  long stackSize, AccessControlContext acc,
+                  boolean inheritThreadLocals) {
+  ...
+  if (inheritThreadLocals && parent.inheritableThreadLocals != null)
+    this.inheritableThreadLocals =
+    ThreadLocal.createInheritedMap(parent.inheritableThreadLocals);
+  ...
+}
+```
+
+### createInheritedMap
+
+在构造子线程的inheritableThreadLocals时，会调用ThreadLocal类的静态方法createInheritedMap，此方法接受一个父进程的ThreadLocalMap，调用ThreadLocalMap的构造方法构造一个ThreadLocalMap。
+
+在ThreadLocalMap的构造方法中，会利用传入的父进程的ThreadLocalMap复制一个ThreadLocalMap。
+
+可以看到在这个构造方法中，调用了InheritableThreadLocal充血的childValue方法，此方法返回的是父进程中ThreadLocalMap中的值。
+
+```java
+static ThreadLocalMap createInheritedMap(ThreadLocalMap parentMap) {
+  return new ThreadLocalMap(parentMap);
+}
+private ThreadLocalMap(ThreadLocalMap parentMap) {
+  Entry[] parentTable = parentMap.table;
+  int len = parentTable.length;
+  setThreshold(len);
+  table = new Entry[len];
+
+  for (int j = 0; j < len; j++) {
+    Entry e = parentTable[j];
+    if (e != null) {
+      @SuppressWarnings("unchecked")
+      ThreadLocal<Object> key = (ThreadLocal<Object>) e.get();
+      if (key != null) {
+        Object value = key.childValue(e.value);
+        Entry c = new Entry(key, value);
+        int h = key.threadLocalHashCode & (len - 1);
+        while (table[h] != null)
+          h = nextIndex(h, len);
+        table[h] = c;
+        size++;
+      }
+    }
+  }
+}
+```
+
+通过上面两个步骤，在初始化一个Thread的时候，父线程的InheritableThreadLocal就会复制到子线程。
+
+### set()
+
+InheritableThreadLocal重写了ThreadLocal的getMap方法，从原来的返回Thread的threadLocalMap属性变味了返回in heritableThreadLocal属性。
+
+```java
+public void set(T value) {
+  Thread t = Thread.currentThread();
+  ThreadLocalMap map = getMap(t);
+  if (map != null) {
+    map.set(this, value);
+  } else {
+    createMap(t, value);
+  }
+}
+```
+
+InheritableThreadLocal重写了createMap方法，在构造ThreadLocalMap的时候，从原来的初始化ThreadLocals属性变为了初始化InheritableThreadLocals属性。
